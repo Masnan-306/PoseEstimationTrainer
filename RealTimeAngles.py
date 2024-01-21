@@ -1,7 +1,9 @@
 import cv2
 import numpy as np
 import torch
+# import monodepth2
 from monodepth2 import networks
+
 from PoseModule import PoseDetector
 # from cvzone.PoseModule import PoseDetector
 
@@ -13,8 +15,10 @@ RIGHT_WRIST = 16
 
 # Load Monodepth2 model (example, you need to download and configure the model)
 if torch.cuda.is_available():
+    print("Using GPU")
     device = torch.device("cuda")
 else:
+    print("Using CPU")
     device = torch.device("cpu")
 encoder_path = 'mono_resnet50_640x192/encoder.pth'
 decoder_path = 'mono_resnet50_640x192/depth.pth'
@@ -27,7 +31,7 @@ encoder.load_state_dict(filtered_dict_enc)
 encoder.to(device)
 encoder.eval()
 
-depth_decoder = networks.DepthDecoder(num_ch_enc=encoder.num_ch_enc, scales=range(4))
+depth_decoder =  networks.DepthDecoder(num_ch_enc=encoder.num_ch_enc, scales=range(4))
 loaded_dict = torch.load(decoder_path, map_location=device)
 depth_decoder.load_state_dict(loaded_dict)
 depth_decoder.to(device)
@@ -79,6 +83,8 @@ def calculate_3d_angle(shoulder_2d, elbow_2d, wrist_2d, depth_map):
 
 # Open camera
 cap = cv2.VideoCapture(0)  # Use 0 for the default camera
+#use usb webcam
+
 detector = PoseDetector()
 
 while True:
@@ -88,8 +94,11 @@ while True:
     # Preprocess the frame
     input_frame = cv2.resize(frame, (640, 192))  # Resize to match Monodepth2 input size
     input_tensor = torch.from_numpy(input_frame.transpose((2, 0, 1))).float().unsqueeze(0)
+    input_tensor = input_tensor.to(device)
 
     # Forward pass to obtain depth map
+    # with torch.no_grad():
+    #     output = depth_decoder(encoder(input_tensor.to(device))).cuda()
     with torch.no_grad():
         output = depth_decoder(encoder(input_tensor))
 
